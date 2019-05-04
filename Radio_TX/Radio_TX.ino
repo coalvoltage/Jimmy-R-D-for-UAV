@@ -71,8 +71,8 @@
 #define RFM69_IRQN    RFM69_IRQ
 */
 
-
 char radiopacket[20] = "Hello World #";
+
 String radiopacketInput;
 
 // Singleton instance of the radio driver
@@ -134,14 +134,13 @@ uint8_t data[] = "  OK";
 
 void loop() {
   delay(1000);  // Wait 1 second between transmits, could also 'sleep' here!
-  
   while(Serial.available()) {
     radiopacketInput = Serial.readString();
     Serial.println(radiopacketInput);
     radiopacketInput.toCharArray(radiopacket, 20);
   }
   
-  itoa(packetnum++, radiopacket+13, 10);
+  //itoa(packetnum++, radiopacket+13, 10);
   Serial.print("Sending "); Serial.println(radiopacket);
   
   // Send a message to the DESTINATION!
