@@ -1,12 +1,12 @@
 #include <SoftwareSerial.h> 
 #include <TinyGPS.h> 
 float lat = 28.5458,lon = 77.1703; // create variable for latitude and longitude object  
-SoftwareSerial gpsSerial(3,4);//rx,tx 
+SoftwareSerial gpsSerial(8,9);//rx,tx 
 TinyGPS gps; // create gps object 
 
 void setup(){ 
   Serial.begin(9600); // be sure to check lower right corner info in an open 'serial windows'
-  gpsSerial.begin(9600);  // may be 4800, 19200,38400 or 57600
+  gpsSerial.begin(57600);  // may be 4800, 19200,38400 or 57600
 } 
 void loop(){ 
   while(gpsSerial.available()){ // check for gps data 

@@ -180,10 +180,11 @@ void loop() {
         Serial.println("Sending failed (no ack)");
     }
   }
+  /*
   // This sketch displays information every time a new sentence is correctly encoded.
     while (ss.available() > 0){
       if (gps.encode(ss.read())){
-        //displayInfo();
+        displayInfo();
       }
     }
 
@@ -191,7 +192,7 @@ void loop() {
   {
     Serial.println(F("No GPS detected: check wiring."));
     while(true);
-  }
+  }*/
 }
 
 
