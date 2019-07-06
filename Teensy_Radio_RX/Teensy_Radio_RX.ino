@@ -57,7 +57,7 @@
   #define LED           13
 #endif
 */
-Teensy 3.x w/wing
+//Teensy 3.x w/wing
 #define RFM69_RST     9   // "A"
 #define RFM69_CS      10   // "B"
 #define RFM69_IRQ     4    // "C"
@@ -72,7 +72,7 @@ Teensy 3.x w/wing
 */
 
 // Singleton instance of the radio driver
-RH_RF69 rf69(RFM69_CS, RFM69_INT);
+RH_RF69 rf69(RFM69_CS, RFM69_IRQN);
 
 // Class to manage message delivery and receipt, using the driver declared above
 RHReliableDatagram rf69_manager(rf69, MY_ADDRESS);
@@ -82,35 +82,35 @@ int16_t packetnum = 0;  // packet counter, we increment per xmission
 
 
 /** GPS Setup **/
-static const int RXPin = 9, TXPin = 8;
+static const int RXPin = 7, TXPin = 8;
 static const uint32_t GPSBaud = 9600;
 
 // The TinyGPS++ object
 TinyGPSPlus gps;
 
 // The serial connection to the GPS device
-SoftwareSerial ss(RXPin, TXPin);
+//SoftwareSerial ss(RXPin, TXPin);
 
 // For stats that happen every 5 seconds
 unsigned long last = 0UL;
 
 void setup() 
 {
-  Serial.begin(115200);
+  Serial.begin(38400);
   //GPS Setup
-  ss.begin(GPSBaud);
+  Serial3.begin(GPSBaud);
   
   //Radio Setup
   
-  //while (!Serial) { delay(1); } // wait until serial console is open, remove if not tethered to computer
-
+  while (!Serial) { delay(1); } // wait until serial console is open, remove if not tethered to computer
+  pinMode(RFM69_CS, OUTPUT);
   //pinMode(LED, OUTPUT);     
   pinMode(RFM69_RST, OUTPUT);
   digitalWrite(RFM69_RST, LOW);
 
   Serial.println("Feather Addressed RFM69 RX Test!");
   Serial.println();
-
+  
   // manual reset
   digitalWrite(RFM69_RST, HIGH);
   delay(10);
@@ -173,18 +173,18 @@ void loop() {
       Serial.print(rf69.lastRssi());
       Serial.print("] : ");
       Serial.println((char*)buf);
-      Blink(LED, 40, 3); //blink LED 3 times, 40ms between blinks
 
       // Send a reply back to the originator client
       if (!rf69_manager.sendtoWait(data, sizeof(data), from))
         Serial.println("Sending failed (no ack)");
     }
   }
-  /*
+  
   // This sketch displays information every time a new sentence is correctly encoded.
-    while (ss.available() > 0){
-      if (gps.encode(ss.read())){
+    while (Serial3.available() > 0){
+      if (gps.encode(Serial3.read())){
         displayInfo();
+        //Serial.print("awoo");
       }
     }
 
@@ -192,7 +192,7 @@ void loop() {
   {
     Serial.println(F("No GPS detected: check wiring."));
     while(true);
-  }*/
+  }
 }
 
 
