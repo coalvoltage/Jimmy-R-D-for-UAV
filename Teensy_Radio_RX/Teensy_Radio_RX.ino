@@ -63,7 +63,17 @@
 #define RFM69_IRQ     4    // "C"
 #define RFM69_IRQN    digitalPinToInterrupt(RFM69_IRQ )
 
- 
+#define LEFTMOTORA 23
+#define LEFTMOTORB 22
+#define RIGHTMOTORA 21
+#define RIGHTMOTORB 20
+
+#define RIGHTENCODERA 19
+#define RIGHTENCODERB 18
+
+#define LEFTENCODERA 17
+#define LEFTENCODERB 16
+
 /* WICED Feather w/wing 
 #define RFM69_RST     PA4     // "A"
 #define RFM69_CS      PB4     // "B"
@@ -254,4 +264,9 @@ void displayInfo()
   }
 
   Serial.println();
+}
+
+void setMotorSpeed(int pin1, int pin2 int speedPWM) {
+  analogWrite(pin1, speedPWM);
+  analogWrite(pin2, LOW);
 }
