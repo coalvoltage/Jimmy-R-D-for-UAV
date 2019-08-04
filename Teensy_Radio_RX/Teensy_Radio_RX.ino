@@ -147,15 +147,24 @@ void setup()
                     0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
   rf69.setEncryptionKey(key);
   
-//pinMode(LED, OUTPUT);
+  //pinMode(LED, OUTPUT);
 
   Serial.print("RFM69 radio @");  Serial.print((int)RF69_FREQ);  Serial.println(" MHz");
 }
 
+//Internal variables
+enum UGVControlState{CONTROL_START, CONTROL_AUTO, CONTROL_MANUAL, CONTROL_STOP};
+enum UGVCommandState{COMMAND_START, COMMAND_STOP, COMMAND_FORWARD, COMMAND_BACK, COMMAND_TURNL, COMMAND_TURNR};
+
+
+unsigned char controlState = CONTROL_MANUAL;
+unsigned char commandState = COMMAND_STOP;
 
 // Dont put this on the stack:
-uint8_t data[20] = "And hello back to you";
+uint8_t dataOut[25] = "And hello back to you";
+uint8_t dataRecieved[25];
 String radiopacketInput;
+
 // Dont put this on the stack:
 uint8_t buf[RH_RF69_MAX_MESSAGE_LEN];
 
@@ -168,7 +177,7 @@ void loop() {
   while(Serial.available()) {
     radiopacketInput = Serial.readString();
     Serial.println(radiopacketInput);
-    radiopacketInput.toCharArray(data, 20);
+    radiopacketInput.toCharArray(data, 25);
   }
   if (rf69_manager.available())
   {
@@ -182,10 +191,11 @@ void loop() {
       Serial.print(" [RSSI :");
       Serial.print(rf69.lastRssi());
       Serial.print("] : ");
-      Serial.println((char*)buf);
+      dataRecieve = buf;
+      Serial.println(dataRecieve);
 
       // Send a reply back to the originator client
-      if (!rf69_manager.sendtoWait(data, sizeof(data), from))
+      if (!rf69_manager.sendtoWait(dataOut, sizeof(dataOut), from))
         Serial.println("Sending failed (no ack)");
     }
   }
@@ -198,10 +208,55 @@ void loop() {
       }
     }
 
+  
   if (millis() > 5000 && gps.charsProcessed() < 10)
   {
     Serial.println(F("No GPS detected: check wiring."));
     while(true);
+  }
+}
+
+unsigned int CommandStateMachine(unsigned int state) {
+  //Command State Machine Transitions
+  switch(state) {
+    case COMMAND_START:
+
+    break;
+    
+    case COMMAND_STOP:
+
+    break;
+
+    case COMMAND_FORWARD:
+
+    break;
+
+    case COMMAND_BACK:
+
+    break;
+
+    default:
+
+    break;
+  }
+
+  //Command State Machine Actions
+  switch(state) {
+    case COMMAND_STOP:
+
+    break;
+
+    case COMMAND_FORWARD:
+
+    break;
+
+    case COMMAND_BACK:
+
+    break;
+
+    default:
+
+    break;
   }
 }
 
