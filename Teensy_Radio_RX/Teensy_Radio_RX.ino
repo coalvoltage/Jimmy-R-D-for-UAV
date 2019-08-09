@@ -60,8 +60,8 @@
 //Teensy 3.x w/wing
 #define RFM69_RST     9   // "A"
 #define RFM69_CS      10   // "B"
-#define RFM69_IRQ     4    // "C"
-#define RFM69_IRQN    digitalPinToInterrupt(RFM69_IRQ )
+#define RFM69_IRQ     2    // "C"
+#define RFM69_IRQN    digitalPinToInterrupt(RFM69_IRQ)
 
 #define LEFTMOTORA 23
 #define LEFTMOTORB 22
@@ -152,17 +152,23 @@ void setup()
   Serial.print("RFM69 radio @");  Serial.print((int)RF69_FREQ);  Serial.println(" MHz");
 }
 
-//Internal variables
+//Internal variables for state machine
 enum UGVControlState{CONTROL_START, CONTROL_AUTO, CONTROL_MANUAL, CONTROL_STOP};
 enum UGVCommandState{COMMAND_START, COMMAND_STOP, COMMAND_FORWARD, COMMAND_BACK, COMMAND_TURNL, COMMAND_TURNR};
 
 
 unsigned char controlState = CONTROL_MANUAL;
 unsigned char commandState = COMMAND_STOP;
+long countL = 0;
+long countR = 0;
+
+
+
+bool commandFinished = false;
 
 // Dont put this on the stack:
-uint8_t dataOut[25] = "And hello back to you";
-uint8_t dataRecieved[25];
+uint8_t dataOut[RH_RF69_MAX_MESSAGE_LEN] = "And hello back to you";
+uint8_t dataRecieved[RH_RF69_MAX_MESSAGE_LEN];
 String radiopacketInput;
 
 // Dont put this on the stack:
@@ -177,7 +183,7 @@ void loop() {
   while(Serial.available()) {
     radiopacketInput = Serial.readString();
     Serial.println(radiopacketInput);
-    radiopacketInput.toCharArray(data, 25);
+    radiopacketInput.toCharArray(dataOut, RH_RF69_MAX_MESSAGE_LEN);
   }
   if (rf69_manager.available())
   {
@@ -191,8 +197,8 @@ void loop() {
       Serial.print(" [RSSI :");
       Serial.print(rf69.lastRssi());
       Serial.print("] : ");
-      dataRecieve = buf;
-      Serial.println(dataRecieve);
+      dataRecieved[0] = buf[0];
+      Serial.println((char*)buf);
 
       // Send a reply back to the originator client
       if (!rf69_manager.sendtoWait(dataOut, sizeof(dataOut), from))
@@ -204,7 +210,6 @@ void loop() {
     while (Serial3.available() > 0){
       if (gps.encode(Serial3.read())){
         displayInfo();
-        //Serial.print("awoo");
       }
     }
 
@@ -220,42 +225,64 @@ unsigned int CommandStateMachine(unsigned int state) {
   //Command State Machine Transitions
   switch(state) {
     case COMMAND_START:
-
+    state = COMMAND_STOP;
     break;
     
     case COMMAND_STOP:
-
     break;
 
     case COMMAND_FORWARD:
-
+    if(commandFinished){
+        state = COMMAND_STOP;
+    }
     break;
 
     case COMMAND_BACK:
+    if(commandFinished){
+        state = COMMAND_STOP;
+    }
+    break;
 
+    case COMMAND_TURNL:
+    if(commandFinished){
+        state = COMMAND_STOP;
+    }
+    break;
+
+    case COMMAND_TURNL:
+    if(commandFinished){
+        state = COMMAND_STOP;
+    }
     break;
 
     default:
-
+    state = COMMAND_START;
     break;
   }
 
   //Command State Machine Actions
   switch(state) {
     case COMMAND_STOP:
-
+    UGV_Stop();
     break;
 
     case COMMAND_FORWARD:
-
+    UGV_Forward();
     break;
 
     case COMMAND_BACK:
-
+    UGV_Back();
     break;
 
-    default:
+    case COMMAND_TURNL:
+    UGV_TurnL();
+    break;
 
+    case COMMAND_TURNR:
+    UGV_TurnR();
+    break;
+    
+    default:
     break;
   }
 }
@@ -319,9 +346,4 @@ void displayInfo()
   }
 
   Serial.println();
-}
-
-void setMotorSpeed(int pin1, int pin2 int speedPWM) {
-  analogWrite(pin1, speedPWM);
-  analogWrite(pin2, LOW);
 }

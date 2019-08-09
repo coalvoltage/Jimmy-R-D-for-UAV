@@ -20,7 +20,7 @@
 const int motorPin1  = 10; // Pin  7 of L293
 const int motorPin2  = 9;  // Pin  2 of L293
 
-const int motorSpeed = 165;
+const int motorSpeed = 156-60;
 
 // variables to store the number of encoder pulses
 // for each motor
@@ -30,15 +30,15 @@ volatile signed long rightCount = 0;
 void setup() {
   //pinMode(LH_ENCODER_A, INPUT);
   //pinMode(LH_ENCODER_B, INPUT);
-  pinMode(RH_ENCODER_A, INPUT);
-  pinMode(RH_ENCODER_B, INPUT);
+  //pinMode(RH_ENCODER_A, INPUT);
+  //pinMode(RH_ENCODER_B, INPUT);
 
   pinMode(motorPin1, OUTPUT);
   pinMode(motorPin2, OUTPUT);
   
   // initialize hardware interrupts
   //attachInterrupt(0, leftEncoderEvent, CHANGE);
-  attachInterrupt(1, rightEncoderEvent, CHANGE);
+  //attachInterrupt(1, rightEncoderEvent, CHANGE);
   
   Serial.begin(9600);
 }
@@ -46,8 +46,8 @@ void setup() {
 void loop() {
   analogWrite(motorPin1, motorSpeed);
   analogWrite(motorPin2, LOW);
-  Serial.print("Right Count: ");
-  Serial.println(rightCount);
+  //Serial.print("Right Count: ");
+  //Serial.println(rightCount);
   //Serial.print("Left Count: ");
   //Serial.println(leftCount);
   //Serial.println();
