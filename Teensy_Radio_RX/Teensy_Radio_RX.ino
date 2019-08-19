@@ -63,16 +63,16 @@
 #define RFM69_IRQ     2    // "C"
 #define RFM69_IRQN    digitalPinToInterrupt(RFM69_IRQ)
 
-#define LEFTMOTORA 23
-#define LEFTMOTORB 22
-#define RIGHTMOTORA 21
-#define RIGHTMOTORB 20
+const int LEFTMOTORA = 23;
+const int LEFTMOTORB = 22;
+const int RIGHTMOTORA = 21;
+const int RIGHTMOTORB = 20;
 
-#define RIGHTENCODERA 19
-#define RIGHTENCODERB 18
+#define RH_ENCODER_A 14
+#define RH_ENCODER_B 15
 
-#define LEFTENCODERA 17
-#define LEFTENCODERB 16
+#define LH_ENCODER_A 16
+#define LH_ENCODER_B 17
 
 /* WICED Feather w/wing 
 #define RFM69_RST     PA4     // "A"
@@ -103,6 +103,10 @@ TinyGPSPlus gps;
 
 // For stats that happen every 5 seconds
 unsigned long last = 0UL;
+
+volatile long countL = 0;
+volatile long countR = 0;
+
 
 void setup() 
 {
@@ -150,24 +154,48 @@ void setup()
   //pinMode(LED, OUTPUT);
 
   Serial.print("RFM69 radio @");  Serial.print((int)RF69_FREQ);  Serial.println(" MHz");
+  
+  //Motor Setup
+  pinMode(RIGHTMOTORA, OUTPUT);
+  pinMode(RIGHTMOTORB, OUTPUT);
+  pinMode(LEFTMOTORA, OUTPUT);
+  pinMode(LEFTMOTORB, OUTPUT);
+  
+  pinMode(LH_ENCODER_A, INPUT);
+  pinMode(LH_ENCODER_B, INPUT);
+  pinMode(RH_ENCODER_A, INPUT);
+  pinMode(RH_ENCODER_B, INPUT);
+
+  attachInterrupt(digitalPinToInterrupt(LH_ENCODER_A), leftEncoderEvent, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(RH_ENCODER_A), rightEncoderEvent, CHANGE);
 }
 
 //Internal variables for state machine
 enum UGVControlState{CONTROL_START, CONTROL_AUTO, CONTROL_MANUAL, CONTROL_STOP};
+//Radio Communicate: 5, 6, 7
 enum UGVCommandState{COMMAND_START, COMMAND_STOP, COMMAND_FORWARD, COMMAND_BACK, COMMAND_TURNL, COMMAND_TURNR};
+//Radio Communicate: 0, 1, 2, 3, 4
 
+unsigned char controlState = CONTROL_START;
+unsigned char commandState = COMMAND_START;
 
-unsigned char controlState = CONTROL_MANUAL;
-unsigned char commandState = COMMAND_STOP;
-long countL = 0;
-long countR = 0;
+long countLSaved = 0;
+long countRSaved = 0;
+unsigned long commandDistance = 0;
 
+const unsigned char DISTANCE_DIGIT_LIMIT = 5;
+
+const int MOTORSPEED = 140;
+uint8_t commandSaved = 0;
 
 
 bool commandFinished = false;
 
 // Dont put this on the stack:
-uint8_t dataOut[RH_RF69_MAX_MESSAGE_LEN] = "And hello back to you";
+
+uint8_t dataOutMaintain[RH_RF69_MAX_MESSAGE_LEN] = "Maintain";
+uint8_t dataOutRecieved[RH_RF69_MAX_MESSAGE_LEN] = "Recieved";
+uint8_t *dataOut = dataOutMaintain;
 uint8_t dataRecieved[RH_RF69_MAX_MESSAGE_LEN];
 String radiopacketInput;
 
@@ -180,11 +208,32 @@ unsigned const long PERIODGPS = 2000;
 
 
 void loop() {
+  //Check for inputs
+  
+  //MicroUsb Serial
   while(Serial.available()) {
     radiopacketInput = Serial.readString();
     Serial.println(radiopacketInput);
     radiopacketInput.toCharArray(dataOut, RH_RF69_MAX_MESSAGE_LEN);
+    //Set first char to command
+    commandSaved = 0x0F & radiopacketInput[0];
+    countLSaved = countL;
+    if(radiopacketInput.length() >= 3) {
+      unsigned char i = 0;
+      for(i = 0; i < DISTANCE_DIGIT_LIMIT && i + 2 < radiopacketInput.length(); ++i) {
+        //Checks how long is parameter
+      }
+      --i;
+      unsigned char k = 0;
+      commandDistance = 0;
+      for(unsigned char j = i; j >= 0 && j + 2 < radiopacketInput.length(); --j) {
+        commandDistance += (radiopacketInput[j + 2] & 0x0F) * pow(10, k);
+        ++k;
+      }
+    }
   }
+
+  //Radio Management
   if (rf69_manager.available())
   {
     // Wait for a message addressed to us from the client
@@ -197,7 +246,17 @@ void loop() {
       Serial.print(" [RSSI :");
       Serial.print(rf69.lastRssi());
       Serial.print("] : ");
-      dataRecieved[0] = buf[0];
+      if(dataRecieved[0] >= 0 && dataRecieved[0] < 10) { 
+        dataRecieved[0] = buf[0];
+        commandSaved = 0x0F & dataRecieved[0];
+        dataRecieved[1] = buf[1];
+        dataRecieved[2] = buf[2];
+        commandDistance = (dataRecieved[1] << 8) | dataRecieved[2];
+        dataOut = dataOutRecieved;
+      }
+      else {
+        dataOut = dataOutMaintain;
+      }
       Serial.println((char*)buf);
 
       // Send a reply back to the originator client
@@ -211,6 +270,10 @@ void loop() {
       if (gps.encode(Serial3.read())){
         displayInfo();
       }
+        Serial.print("CountL: ");
+        Serial.println(countL);
+        Serial.print("CountR: ");
+        Serial.println(countR);
     }
 
   
@@ -219,7 +282,14 @@ void loop() {
     Serial.println(F("No GPS detected: check wiring."));
     while(true);
   }
+
+  //Output
+  //UGV State Machine Execute
+  commandState = CommandStateMachine(commandState);
+  
+
 }
+
 
 unsigned int CommandStateMachine(unsigned int state) {
   //Command State Machine Transitions
@@ -229,29 +299,98 @@ unsigned int CommandStateMachine(unsigned int state) {
     break;
     
     case COMMAND_STOP:
+    if(commandSaved == 1) {
+        state = COMMAND_FORWARD;
+        Serial.println("Popper");
+    }
+    else if(commandSaved == 2) {
+        state = COMMAND_BACK;
+    }
+    else if(commandSaved == 3) {
+        state = COMMAND_TURNL;
+    }
+    else if(commandSaved == 4) {
+        state = COMMAND_TURNR;
+    }
     break;
 
     case COMMAND_FORWARD:
     if(commandFinished){
         state = COMMAND_STOP;
+        commandSaved = 0;
+        commandFinished = false;
+    }
+    else if(commandSaved == 0){
+        state = COMMAND_STOP;
+    }
+    else if(commandSaved == 2) {
+        state = COMMAND_BACK;
+    }
+    else if(commandSaved == 3) {
+        state = COMMAND_TURNL;
+    }
+    else if(commandSaved == 4) {
+        state = COMMAND_TURNR;
     }
     break;
 
     case COMMAND_BACK:
     if(commandFinished){
         state = COMMAND_STOP;
+        commandSaved = 0;
+        commandFinished = false;
+    }
+    else if(commandSaved == 0){
+        state = COMMAND_STOP;
+    }
+    else if(commandSaved == 1) {
+        state = COMMAND_FORWARD;
+    }
+    else if(commandSaved == 3) {
+        state = COMMAND_TURNL;
+    }
+    else if(commandSaved == 4) {
+        state = COMMAND_TURNR;
     }
     break;
 
     case COMMAND_TURNL:
     if(commandFinished){
         state = COMMAND_STOP;
+        commandSaved = 0;
+        commandFinished = false;
+    }
+    else if(commandSaved == 0){
+        state = COMMAND_STOP;
+    }
+    else if(commandSaved == 1) {
+        state = COMMAND_FORWARD;
+    }
+    else if(commandSaved == 2) {
+        state = COMMAND_BACK;
+    }
+    else if(commandSaved == 4) {
+        state = COMMAND_TURNR;
     }
     break;
 
-    case COMMAND_TURNL:
+    case COMMAND_TURNR:
     if(commandFinished){
         state = COMMAND_STOP;
+        commandSaved = 0;
+        commandFinished = false;
+    }
+    else if(commandSaved == 0){
+        state = COMMAND_STOP;
+    }
+    else if(commandSaved == 1) {
+        state = COMMAND_FORWARD;
+    }
+    else if(commandSaved == 2) {
+        state = COMMAND_BACK;
+    }
+    else if(commandSaved == 3) {
+        state = COMMAND_TURNL;
     }
     break;
 
@@ -264,29 +403,83 @@ unsigned int CommandStateMachine(unsigned int state) {
   switch(state) {
     case COMMAND_STOP:
     UGV_Stop();
+    //Serial.println("help");
     break;
 
     case COMMAND_FORWARD:
-    UGV_Forward();
+    commandFinished = UGV_Forward(countLSaved, countLSaved, commandDistance);
+    //Serial.println("popping");
     break;
 
     case COMMAND_BACK:
-    UGV_Back();
+    commandFinished = UGV_Back(countLSaved, countLSaved, commandDistance);
     break;
 
     case COMMAND_TURNL:
-    UGV_TurnL();
+    commandFinished = UGV_TurnL(countLSaved, countLSaved, commandDistance);
     break;
 
     case COMMAND_TURNR:
-    UGV_TurnR();
+    commandFinished = UGV_TurnR(countLSaved, countRSaved, commandDistance);
     break;
     
     default:
     break;
   }
+  return state;
 }
 
+void UGV_Stop() {
+    analogWrite(LEFTMOTORA, 0);
+    analogWrite(LEFTMOTORB, LOW);
+    analogWrite(RIGHTMOTORA, 0);
+    analogWrite(RIGHTMOTORB, LOW);
+}
+
+bool UGV_Forward(long recordedEncoderL, long recordedEncoderR, unsigned long distance) {
+    analogWrite(LEFTMOTORA, MOTORSPEED);
+    analogWrite(LEFTMOTORB, LOW);
+    analogWrite(RIGHTMOTORA, MOTORSPEED);
+    analogWrite(RIGHTMOTORB, LOW);
+    if(abs(countL - recordedEncoderL) >= distance) {
+        return true;
+    }
+    return false;
+}
+
+bool UGV_Back(long recordedEncoderL, long recordedEncoderR, unsigned long distance) {
+    analogWrite(LEFTMOTORA, LOW);
+    analogWrite(LEFTMOTORB, MOTORSPEED);
+    analogWrite(RIGHTMOTORA, LOW);
+    analogWrite(RIGHTMOTORB, MOTORSPEED);
+    if(abs(countL - recordedEncoderL) >= distance) {
+        return true;
+    }
+    return false;
+}
+
+bool UGV_TurnL(long recordedEncoderL, long recordedEncoderR, unsigned long distance) {
+    analogWrite(LEFTMOTORA, MOTORSPEED);
+    analogWrite(LEFTMOTORB, LOW);
+    analogWrite(RIGHTMOTORA, LOW);
+    analogWrite(RIGHTMOTORB, MOTORSPEED);
+    
+    if(abs(countL - recordedEncoderL) >= distance) {
+        return true;
+    }
+    return false;
+}
+
+bool UGV_TurnR(long recordedEncoderL, long recordedEncoderR, long distance) {
+    analogWrite(LEFTMOTORA, LOW);
+    analogWrite(LEFTMOTORB, MOTORSPEED);
+    analogWrite(RIGHTMOTORA, MOTORSPEED);
+    analogWrite(RIGHTMOTORB, LOW);
+    if(abs(countL - recordedEncoderL) >= distance) {
+        return true;
+    }
+    return false;
+}
 
 void Blink(byte PIN, byte DELAY_MS, byte loops) {
   for (byte i=0; i<loops; i++)  {
@@ -346,4 +539,38 @@ void displayInfo()
   }
 
   Serial.println();
+}
+
+// encoder event for the interrupt call
+void leftEncoderEvent() {
+  if (digitalRead(LH_ENCODER_A) == HIGH) {
+    if (digitalRead(LH_ENCODER_B) == LOW) {
+      countL++;
+    } else {
+      countL--;
+    }
+  } else {
+    if (digitalRead(LH_ENCODER_B) == LOW) {
+      countL--;
+    } else {
+      countL++;
+    }
+  }
+}
+ 
+// encoder event for the interrupt call
+void rightEncoderEvent() {
+  if (digitalRead(RH_ENCODER_A) == HIGH) {
+    if (digitalRead(RH_ENCODER_B) == LOW) {
+      countR++;
+    } else {
+      countR--;
+    }
+  } else {
+    if (digitalRead(RH_ENCODER_B) == LOW) {
+      countR--;
+    } else {
+      countR++;
+    }
+  }
 }
