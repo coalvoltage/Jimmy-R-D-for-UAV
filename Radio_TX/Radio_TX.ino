@@ -61,7 +61,7 @@
 #define RFM69_IRQN    RFM69_IRQ
 */
 
-char radiopacket[20] = "Hello World #";
+uint8_t radiopacket[20] = "Hello World #";
 
 String radiopacketInput;
 
@@ -122,16 +122,47 @@ void setup()
 uint8_t buf[RH_RF69_MAX_MESSAGE_LEN];
 uint8_t data[] = "  OK";
 
+const unsigned char DISTANCE_DIGIT_LIMIT = 5;
+unsigned short commandDistance = 0;
+
+const unsigned char DUMMY_COMMAND_VALUE = 0x0F;
+unsigned char commandSaved =  DUMMY_COMMAND_VALUE;
+
+bool isSendingCommand = false;
+char recieveChar = 'R';
+
 void loop() {
   delay(1000);  // Wait 1 second between transmits, could also 'sleep' here!
   while(Serial.available()) {
     radiopacketInput = Serial.readString();
     Serial.println(radiopacketInput);
-    radiopacketInput.toCharArray(radiopacket, 20);
+    //Set first char to command
+    commandSaved = 0x0F & radiopacketInput[0];
+    if(radiopacketInput.length() >= 3) {
+      unsigned char i = 0;
+      for(i = 0; i < DISTANCE_DIGIT_LIMIT && i + 2 < radiopacketInput.length(); ++i) {
+        //Checks how long is parameter
+      }
+      --i;
+      unsigned char k = 0;
+      commandDistance = 0;
+      for(unsigned char j = i; j >= 0 && j + 2 < radiopacketInput.length(); --j) {
+        commandDistance += (radiopacketInput[j + 2] & 0x0F) * pow(10, k);
+        ++k;
+      }
+    }
+    unsigned long operationTemp;
+
+    radiopacket[0] = commandSaved;
+    operationTemp = commandDistance >> 8;
+    radiopacket[1] = operationTemp;
+    operationTemp = commandDistance & 0x00FF;
+    radiopacket[2] = operationTemp;
+    isSendingCommand = true;    
   }
   
   //itoa(packetnum++, radiopacket+13, 10);
-  Serial.print("Sending "); Serial.println(radiopacket);
+  Serial.print("Sending ");
   
   // Send a message to the DESTINATION!
   if (rf69_manager.sendtoWait((uint8_t *)radiopacket, strlen(radiopacket), DEST_ADDRESS)) {
@@ -145,7 +176,10 @@ void loop() {
       Serial.print(" [RSSI :");
       Serial.print(rf69.lastRssi());
       Serial.print("] : ");
-      Serial.println((char*)buf);     
+      Serial.println((char*)buf);
+      if(buf[0] == recieveChar) {
+        radiopacket[0] = DUMMY_COMMAND_VALUE;
+      }
       Blink(LED, 40, 3); //blink LED 3 times, 40ms between blinks
     } else {
       Serial.println("No reply, is anyone listening?");

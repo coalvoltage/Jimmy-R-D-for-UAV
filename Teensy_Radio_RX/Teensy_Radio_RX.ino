@@ -214,10 +214,10 @@ void loop() {
   while(Serial.available()) {
     radiopacketInput = Serial.readString();
     Serial.println(radiopacketInput);
-    radiopacketInput.toCharArray(dataOut, RH_RF69_MAX_MESSAGE_LEN);
     //Set first char to command
     commandSaved = 0x0F & radiopacketInput[0];
     countLSaved = countL;
+    countRSaved = countR;
     if(radiopacketInput.length() >= 3) {
       unsigned char i = 0;
       for(i = 0; i < DISTANCE_DIGIT_LIMIT && i + 2 < radiopacketInput.length(); ++i) {
@@ -246,6 +246,15 @@ void loop() {
       Serial.print(" [RSSI :");
       Serial.print(rf69.lastRssi());
       Serial.print("] : ");
+      dataRecieved[0] = buf[0];
+      
+      unsigned long tempRadioValue = 0;
+      tempRadioValue = dataRecieved[0];
+      Serial.println(tempRadioValue);
+      tempRadioValue = dataRecieved[1];
+      Serial.println(tempRadioValue);
+      tempRadioValue = dataRecieved[2];
+      Serial.println(tempRadioValue);
       if(dataRecieved[0] >= 0 && dataRecieved[0] < 10) { 
         dataRecieved[0] = buf[0];
         commandSaved = 0x0F & dataRecieved[0];
@@ -253,6 +262,9 @@ void loop() {
         dataRecieved[2] = buf[2];
         commandDistance = (dataRecieved[1] << 8) | dataRecieved[2];
         dataOut = dataOutRecieved;
+        countLSaved = countL;
+        countRSaved = countR;
+        
       }
       else {
         dataOut = dataOutMaintain;
@@ -268,12 +280,12 @@ void loop() {
   // This sketch displays information every time a new sentence is correctly encoded.
     while (Serial3.available() > 0){
       if (gps.encode(Serial3.read())){
-        displayInfo();
+        //displayInfo();
       }
-        Serial.print("CountL: ");
+        /*Serial.print("CountL: ");
         Serial.println(countL);
         Serial.print("CountR: ");
-        Serial.println(countR);
+        Serial.println(countR);*/
     }
 
   
