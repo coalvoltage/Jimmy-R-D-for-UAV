@@ -1,17 +1,14 @@
-// rf69 demo tx rx.pde
-// -*- mode: C++ -*-
-// Example sketch showing how to create a simple addressed, reliable messaging client
-// with the RH_RF69 class. RH_RF69 class does not provide for addressing or
-// reliability, so you should only use RH_RF69  if you do not need the higher
-// level messaging abilities.
-// It is designed to work with the other example rf69_server.
-// Demonstrates the use of AES encryption, setting the frequency and modem 
-// configuration
+#include <Wire.h>
 #include <TinyGPS++.h>
 #include <SoftwareSerial.h>
 #include <SPI.h>
 #include <RH_RF69.h>
 #include <RHReliableDatagram.h>
+#include <Adafruit_LSM9DS1.h>
+#include <Adafruit_Sensor.h>  // not used in this demo but required!
+#include "Adafruit_BMP3XX.h"
+#include <math.h>
+
 
 /************ Radio Setup ***************/
 
@@ -20,6 +17,17 @@
 
 // who am i? (server address)
 #define MY_ADDRESS     1
+
+#define LSM9DS1_SCK A5
+#define LSM9DS1_MISO 12
+#define LSM9DS1_MOSI A4
+#define LSM9DS1_XGCS 6
+#define LSM9DS1_MCS 5
+#define BMP_SCK 13
+#define BMP_MISO 12
+#define BMP_MOSI 11
+#define BMP_CS 10
+#define SEALEVELPRESSURE_HPA (1013.25)
 
 /*
 #if defined (__AVR_ATmega32U4__) // Feather 32u4 w/Radio
